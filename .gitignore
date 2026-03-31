@@ -1,0 +1,9 @@
+node_modules
+dist
+.vite
+*.local
+.env
+.env.*
+!.env.example
+deployer-key.json
+tsconfig.tsbuildinfo
