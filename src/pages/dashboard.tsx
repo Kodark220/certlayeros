@@ -18,9 +18,6 @@ import {
   AlertTriangle,
   Clock,
   ArrowUpRight,
-  KeyRound,
-  Eye as EyeIcon,
-  EyeOff,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,7 +47,7 @@ interface PromiseData {
 }
 
 export function DashboardPage() {
-  const { user, exportPrivateKey } = useAuth();
+  const { user } = useAuth();
   const { role, loading: roleLoading, protocolData, refreshRole } = useRole();
   const [allPromises, setAllPromises] = useState<PromiseData[]>([]);
   const [myPromises, setMyPromises] = useState<PromiseData[]>([]);
@@ -58,10 +55,6 @@ export function DashboardPage() {
   const [claimable, setClaimable] = useState<string>("0");
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [exportPw, setExportPw] = useState("");
-  const [showExport, setShowExport] = useState(false);
-  const [exportedKey, setExportedKey] = useState("");
-  const [exportLoading, setExportLoading] = useState(false);
 
   // Registration form (for watcher view)
   const [regForm, setRegForm] = useState({ name: "", website: "", tokenAddress: "none" });
@@ -155,7 +148,7 @@ export function DashboardPage() {
   }
 
   function copyAddress() {
-    navigator.clipboard.writeText(user?.externalAddress || addr);
+    navigator.clipboard.writeText(user?.walletAddress || addr);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -230,11 +223,11 @@ export function DashboardPage() {
                       ? "Contract Admin"
                       : role === "protocol"
                       ? protocolData?.name || "Unregistered Protocol"
-                      : user?.walletName || "Connected Wallet"}
+                      : "Connected Wallet"}
                   </p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono text-muted-foreground truncate max-w-[260px]">
-                      {user?.externalAddress || addr}
+                      {user?.walletAddress || addr}
                     </p>
                     <button onClick={copyAddress} className="text-muted-foreground hover:text-foreground transition-colors">
                       {copied ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
@@ -243,11 +236,6 @@ export function DashboardPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {user?.externalAddress && (
-                  <span className="text-[11px] font-mono text-muted-foreground hidden lg:inline">
-                    GL: {addr.slice(0, 8)}...
-                  </span>
-                )}
                 <a
                   href={`${NETWORK.explorer}/address/${addr}`}
                   target="_blank"
@@ -262,60 +250,8 @@ export function DashboardPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   {NETWORK.name}
                 </Badge>
-                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={() => setShowExport(!showExport)}>
-                  <KeyRound className="w-3 h-3" />
-                  Export Key
-                </Button>
               </div>
             </div>
-            {showExport && (
-              <div className="mt-3 pt-3 border-t space-y-3">
-                {!exportedKey ? (
-                  <div className="flex gap-2">
-                    <Input
-                      type="password"
-                      placeholder="Enter your password"
-                      value={exportPw}
-                      onChange={(e) => setExportPw(e.target.value)}
-                      className="text-sm"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={exportLoading || !exportPw}
-                      onClick={async () => {
-                        setExportLoading(true);
-                        try {
-                          const pk = await exportPrivateKey(exportPw);
-                          setExportedKey(pk);
-                        } catch {
-                          toast.error("Wrong password");
-                        } finally {
-                          setExportLoading(false);
-                        }
-                      }}
-                    >
-                      {exportLoading ? <Spinner /> : "Decrypt"}
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs font-mono bg-red-50 border border-red-200 rounded-md p-2 break-all select-all">
-                      {exportedKey}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(exportedKey); toast.success("Copied!"); }}>
-                        <Copy className="w-3 h-3 mr-1" /> Copy
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setExportedKey(""); setExportPw(""); setShowExport(false); }}>
-                        Hide
-                      </Button>
-                    </div>
-                    <p className="text-[11px] text-red-500">Save this key safely. Anyone with this key controls your funds.</p>
-                  </div>
-                )}
-              </div>
-            )}
           </CardContent>
         </Card>
 

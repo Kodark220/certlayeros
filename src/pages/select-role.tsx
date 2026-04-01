@@ -114,8 +114,8 @@ export function SelectRolePage() {
         <p className="text-center text-xs text-muted-foreground/60">
           Connected as{" "}
           <span className="font-mono">
-            {user?.externalAddress
-              ? `${user.externalAddress.slice(0, 6)}...${user.externalAddress.slice(-4)}`
+            {user?.walletAddress
+              ? `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
               : `${user?.address.slice(0, 6)}...${user?.address.slice(-4)}`}
           </span>
         </p>

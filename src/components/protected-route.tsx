@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { Spinner } from "@/components/spinner";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, needsUnlock } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
