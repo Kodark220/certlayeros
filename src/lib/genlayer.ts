@@ -1,10 +1,14 @@
-import { createClient, createAccount } from "genlayer-js";
+import { createClient } from "genlayer-js";
 import { TransactionStatus, CalldataAddress } from "genlayer-js/types";
 import { testnetBradbury } from "genlayer-js/chains";
 import { CONTRACT_ADDRESS } from "./contract";
 
-let clientInstance: ReturnType<typeof createClient> | null = null;
-let currentPrivateKey: string | null = null;
+// Read client — no wallet needed, talks directly to RPC
+const readClientInstance = createClient({ chain: testnetBradbury });
+
+// Write client — signs through the wallet provider (MetaMask)
+let writeClientInstance: ReturnType<typeof createClient> | null = null;
+let currentWalletAddress: string | null = null;
 
 export function toCalldataAddress(hexStr: string): CalldataAddress {
   const hex = hexStr.replace("0x", "");
@@ -13,34 +17,34 @@ export function toCalldataAddress(hexStr: string): CalldataAddress {
   );
 }
 
-export function setAuthAccount(privateKey: string) {
-  if (privateKey !== currentPrivateKey) {
-    currentPrivateKey = privateKey;
-    clientInstance = null;
-  }
-}
-
-export function clearAuthAccount() {
-  currentPrivateKey = null;
-  clientInstance = null;
-}
-
-export function getClient() {
-  if (!clientInstance) {
-    const account = currentPrivateKey
-      ? createAccount(currentPrivateKey as `0x${string}`)
-      : createAccount();
-    clientInstance = createClient({
+/** Set up the write client using the connected wallet address + provider */
+export function setWalletProvider(address: string) {
+  const eth = (window as any).ethereum;
+  if (!eth) throw new Error("No wallet provider found");
+  if (address !== currentWalletAddress) {
+    currentWalletAddress = address;
+    writeClientInstance = createClient({
       chain: testnetBradbury,
-      account,
+      account: address as `0x${string}`,
+      provider: eth,
     });
   }
-  return clientInstance;
+}
+
+export function clearWalletProvider() {
+  currentWalletAddress = null;
+  writeClientInstance = null;
+}
+
+/** Switch the wallet to the GenLayer Bradbury testnet */
+export async function connectWalletToChain() {
+  if (writeClientInstance) {
+    await writeClientInstance.connect("testnetBradbury");
+  }
 }
 
 export async function readContract(functionName: string, args: any[] = []) {
-  const client = getClient();
-  return client.readContract({
+  return readClientInstance.readContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName,
     args,
@@ -52,14 +56,14 @@ export async function writeContract(
   args: any[] = [],
   value: number = 0
 ) {
-  const client = getClient();
-  const hash = await client.writeContract({
+  if (!writeClientInstance) throw new Error("Wallet not connected");
+  const hash = await writeClientInstance.writeContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName,
     args,
     value: BigInt(value),
   } as any);
-  const receipt = await client.waitForTransactionReceipt({
+  const receipt = await readClientInstance.waitForTransactionReceipt({
     hash,
     status: TransactionStatus.ACCEPTED,
   });

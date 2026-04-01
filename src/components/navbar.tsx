@@ -52,7 +52,7 @@ export function Navbar() {
     navigate("/login");
   }
 
-  const displayAddr = user?.walletAddress || user?.address || "";
+  const displayAddr = user?.address || "";
   const truncatedAddr = displayAddr
     ? `${displayAddr.slice(0, 6)}...${displayAddr.slice(-4)}`
     : null;

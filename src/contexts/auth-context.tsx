@@ -1,14 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { createAccount } from "genlayer-js";
-import { setAuthAccount, clearAuthAccount } from "@/lib/genlayer";
+import { setWalletProvider, clearWalletProvider, connectWalletToChain } from "@/lib/genlayer";
 
 export interface AuthUser {
-  /** GenLayer address (derived from signature) */
+  /** The wallet address — same address used on-chain as msg.sender */
   address: string;
-  /** MetaMask address (display identity) */
-  walletAddress: string;
-  /** GenLayer private key (in-memory only, never stored) */
-  privateKey: string;
   chosenRole?: "protocol" | "watcher";
 }
 
@@ -23,19 +18,9 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const SESSION_KEY = "certlayer_session";
-const SIGN_MESSAGE = "Sign in to CertLayer\n\nThis signature is used to derive your CertLayer account. It does not trigger a transaction or cost any gas.";
-
-/** Derive a deterministic GenLayer private key from a MetaMask signature. */
-async function derivePrivateKey(signature: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(signature);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return "0x" + hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 interface StoredSession {
-  walletAddress: string;
+  address: string;
   chosenRole?: "protocol" | "watcher";
 }
 
@@ -63,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount, check if MetaMask is still connected from a previous session
+  // On mount, check if wallet is still connected from a previous session
   useEffect(() => {
     async function tryReconnect() {
       const session = loadSession();
@@ -80,10 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        // Check if MetaMask still has this account connected (no popup)
+        // Check if wallet still has this account connected (no popup)
         const accounts: string[] = await eth.request({ method: "eth_accounts" });
         const connected = accounts.find(
-          (a: string) => a.toLowerCase() === session.walletAddress.toLowerCase()
+          (a: string) => a.toLowerCase() === session.address.toLowerCase()
         );
         if (!connected) {
           clearSession();
@@ -91,24 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Re-derive key by asking user to sign again
-        const signature: string = await eth.request({
-          method: "personal_sign",
-          params: [SIGN_MESSAGE, connected],
-        });
-        const pk = await derivePrivateKey(signature);
-        const account = createAccount(pk as `0x${string}`);
+        // Set up write client with the connected wallet
+        setWalletProvider(connected.toLowerCase());
 
-        const u: AuthUser = {
-          address: account.address,
-          walletAddress: connected.toLowerCase(),
-          privateKey: pk,
+        setUser({
+          address: connected.toLowerCase(),
           chosenRole: session.chosenRole,
-        };
-        setUser(u);
-        setAuthAccount(pk);
+        });
       } catch {
-        // User rejected sign or MetaMask error — clear session
         clearSession();
       }
       setLoading(false);
@@ -117,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tryReconnect();
   }, []);
 
-  // Listen for MetaMask account changes
+  // Listen for wallet account changes
   useEffect(() => {
     const eth = (window as any).ethereum;
     if (!eth) return;
@@ -126,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!accounts.length) {
         // User disconnected
         setUser(null);
-        clearAuthAccount();
+        clearWalletProvider();
         clearSession();
       }
     }
@@ -139,33 +114,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const eth = (window as any).ethereum;
     if (!eth) throw new Error("MetaMask not detected. Please install MetaMask.");
 
-    // Request account access (shows MetaMask popup if not already connected)
+    // Request account access (shows popup if not already connected)
     const accounts: string[] = await eth.request({ method: "eth_requestAccounts" });
-    if (!accounts.length) throw new Error("No accounts returned from MetaMask");
-    const walletAddr = accounts[0].toLowerCase();
+    if (!accounts.length) throw new Error("No accounts returned from wallet");
+    const addr = accounts[0].toLowerCase();
 
-    // Ask user to sign a message (derives their unique GenLayer key)
-    const signature: string = await eth.request({
-      method: "personal_sign",
-      params: [SIGN_MESSAGE, accounts[0]],
-    });
+    // Set up the write client with the wallet provider
+    setWalletProvider(addr);
 
-    const pk = await derivePrivateKey(signature);
-    const account = createAccount(pk as `0x${string}`);
+    // Switch the wallet to GenLayer Bradbury testnet
+    try {
+      await connectWalletToChain();
+    } catch {
+      // Non-fatal — user may reject the chain switch but can still proceed
+    }
 
-    const u: AuthUser = {
-      address: account.address,
-      walletAddress: walletAddr,
-      privateKey: pk,
-    };
-    setUser(u);
-    setAuthAccount(pk);
-    saveSession({ walletAddress: walletAddr });
+    setUser({ address: addr });
+    saveSession({ address: addr });
   }
 
   function logout() {
     setUser(null);
-    clearAuthAccount();
+    clearWalletProvider();
     clearSession();
   }
 

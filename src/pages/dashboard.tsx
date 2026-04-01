@@ -148,7 +148,7 @@ export function DashboardPage() {
   }
 
   function copyAddress() {
-    navigator.clipboard.writeText(user?.walletAddress || addr);
+    navigator.clipboard.writeText(addr);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -227,7 +227,7 @@ export function DashboardPage() {
                   </p>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-mono text-muted-foreground truncate max-w-[260px]">
-                      {user?.walletAddress || addr}
+                      {addr}
                     </p>
                     <button onClick={copyAddress} className="text-muted-foreground hover:text-foreground transition-colors">
                       {copied ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
