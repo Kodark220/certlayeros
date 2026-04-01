@@ -12,6 +12,8 @@ import {
   Plus,
   Download,
   Globe,
+  Lock,
+  ShieldCheck,
 } from "lucide-react";
 import { PageTransition } from "@/components/motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,21 +25,32 @@ import { Spinner } from "@/components/spinner";
 import { useAuth } from "@/contexts/auth-context";
 import toast from "react-hot-toast";
 
-type ConnectStep = "choose" | "email" | "import-key";
+type ConnectStep = "choose" | "email" | "import-key" | "generate";
 
 const hasMetaMask = typeof window !== "undefined" && !!(window as any).ethereum;
 
 export function LoginPage() {
-  const { loginWithEmail, loginWithWallet, loginWithMetaMask } = useAuth();
+  const { loginWithEmail, loginWithWallet, loginWithMetaMask, needsUnlock, unlockSession } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState<ConnectStep>("choose");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [privateKey, setPrivateKey] = useState("");
   const [showKey, setShowKey] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState("");
 
   function go(target: string) {
     navigate(target);
+  }
+
+  function validatePassword(pw: string): string | null {
+    if (pw.length < 8) return "Password must be at least 8 characters";
+    if (!/[A-Z]/.test(pw)) return "Password must include an uppercase letter";
+    if (!/[0-9]/.test(pw)) return "Password must include a number";
+    return null;
   }
 
   async function handleEmailLogin(e: React.FormEvent) {
@@ -46,36 +59,61 @@ export function LoginPage() {
       toast.error("Enter a valid email address");
       return;
     }
+    const pwErr = validatePassword(password);
+    if (pwErr) { toast.error(pwErr); return; }
     setLoading(true);
     try {
-      loginWithEmail(email.trim());
+      await loginWithEmail(email.trim(), password);
       toast.success("Logged in successfully!");
       go("/select-role");
     } catch (err: any) {
-      toast.error(err?.message?.slice(0, 100) || "Login failed");
+      const msg = err?.message || "";
+      if (msg.includes("decrypt") || msg.includes("operation")) {
+        toast.error("Wrong password for this account");
+      } else {
+        toast.error(msg.slice(0, 100) || "Login failed");
+      }
     } finally {
       setLoading(false);
     }
   }
 
   async function handleMetaMask() {
+    if (!password) {
+      toast.error("Set a password to encrypt your wallet key");
+      return;
+    }
+    const pwErr = validatePassword(password);
+    if (pwErr) { toast.error(pwErr); return; }
     setLoading(true);
     try {
-      await loginWithMetaMask();
+      await loginWithMetaMask(password);
       toast.success("MetaMask connected!");
       go("/select-role");
     } catch (err: any) {
-      toast.error(err?.message?.slice(0, 100) || "MetaMask connection failed");
+      const msg = err?.message || "";
+      if (msg.includes("decrypt") || msg.includes("operation")) {
+        toast.error("Wrong password for this MetaMask account");
+      } else {
+        toast.error(msg.slice(0, 100) || "MetaMask connection failed");
+      }
     } finally {
       setLoading(false);
     }
   }
 
-  function handleGenerate() {
+  async function handleGenerate(e: React.FormEvent) {
+    e.preventDefault();
+    const pwErr = validatePassword(password);
+    if (pwErr) { toast.error(pwErr); return; }
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
     setLoading(true);
     try {
-      loginWithWallet();
-      toast.success("New wallet created!");
+      await loginWithWallet(password);
+      toast.success("New wallet created! Save your password — it encrypts your key.");
       go("/select-role");
     } catch (err: any) {
       toast.error(err?.message?.slice(0, 100) || "Failed to generate wallet");
@@ -84,21 +122,112 @@ export function LoginPage() {
     }
   }
 
-  function handleImport() {
+  async function handleImport(e: React.FormEvent) {
+    e.preventDefault();
     if (!privateKey.trim()) {
       toast.error("Please enter a private key");
       return;
     }
+    const pwErr = validatePassword(password);
+    if (pwErr) { toast.error(pwErr); return; }
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
     setLoading(true);
     try {
-      loginWithWallet(privateKey.trim());
-      toast.success("Wallet imported!");
+      await loginWithWallet(password, privateKey.trim());
+      toast.success("Wallet imported and encrypted!");
       go("/select-role");
     } catch (err: any) {
       toast.error(err?.message?.slice(0, 100) || "Import failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleUnlock(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await unlockSession(unlockPassword);
+      toast.success("Session unlocked!");
+      go("/dashboard");
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("decrypt") || msg.includes("operation")) {
+        toast.error("Wrong password");
+      } else {
+        toast.error(msg.slice(0, 100) || "Unlock failed");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ─── Unlock screen (session expired or page reload) ───
+  if (needsUnlock) {
+    return (
+      <PageTransition>
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
+        <div className="fixed inset-0 -z-10">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[128px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/20 rounded-full blur-[128px]" />
+        </div>
+        <div className="w-full max-w-md animate-fade-in">
+          <div className="text-center mb-8">
+            <Link to="/" className="inline-flex items-center gap-3 mb-4">
+              <img src="/logo.png" alt="CertLayer" className="w-12 h-12 rounded-xl" />
+            </Link>
+            <h1 className="text-2xl font-bold">Session Locked</h1>
+            <p className="text-muted-foreground mt-2">
+              Enter your password to unlock your wallet
+            </p>
+          </div>
+          <Card className="bg-white border border-border">
+            <CardContent className="pt-6">
+              <form onSubmit={handleUnlock} className="space-y-4">
+                <div className="flex justify-center mb-2">
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Lock className="w-8 h-8 text-primary" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unlock-pw">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="unlock-pw"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={unlockPassword}
+                      onChange={(e) => setUnlockPassword(e.target.value)}
+                      required
+                      autoFocus
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button type="submit" variant="glow" className="w-full gap-2" disabled={loading}>
+                  {loading ? <Spinner className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                  Unlock
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            Your private key is encrypted locally. Only your password can decrypt it.
+          </p>
+        </div>
+      </div>
+      </PageTransition>
+    );
   }
 
   return (
@@ -129,8 +258,11 @@ export function LoginPage() {
           <div className="space-y-3 animate-fade-in">
             {/* MetaMask */}
             <button
-              onClick={handleMetaMask}
-              disabled={!hasMetaMask || loading}
+              onClick={() => {
+                setStep("choose");
+                handleMetaMask();
+              }}
+              disabled={!hasMetaMask || loading || !password}
               className="w-full group relative flex items-center gap-4 p-4 rounded-xl border border-border bg-white hover:border-primary/40 hover:bg-secondary/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <div className="w-11 h-11 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0">
@@ -165,7 +297,7 @@ export function LoginPage() {
 
             {/* Generate New Wallet */}
             <button
-              onClick={handleGenerate}
+              onClick={() => setStep("generate")}
               disabled={loading}
               className="w-full group flex items-center gap-4 p-4 rounded-xl border border-border bg-white hover:border-primary/40 hover:bg-secondary/50 transition-all disabled:opacity-40"
             >
@@ -218,8 +350,35 @@ export function LoginPage() {
             </button>
 
             <p className="text-center text-xs text-muted-foreground pt-2">
-              Your keys are stored locally in this browser. We never store your private keys on a server.
+              <ShieldCheck className="w-3 h-3 inline-block mr-1" />
+              Your keys are AES-256 encrypted with your password. We never store private keys in plain text.
             </p>
+
+            {/* Password for MetaMask */}
+            {hasMetaMask && (
+              <div className="space-y-2 pt-1">
+                <Label htmlFor="mm-pw" className="text-xs text-muted-foreground">
+                  Set a password for MetaMask (encrypts your GenLayer key)
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="mm-pw"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Min 8 chars, 1 uppercase, 1 number"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-10 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -239,7 +398,7 @@ export function LoginPage() {
                 Sign in with Email
               </CardTitle>
               <CardDescription>
-                A wallet will be automatically created for your account
+                A wallet will be created and encrypted with your password
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -256,6 +415,27 @@ export function LoginPage() {
                     autoFocus
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email-pw">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="email-pw"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Min 8 chars, 1 uppercase, 1 number"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
                 <Button
                   type="submit"
                   variant="glow"
@@ -268,8 +448,68 @@ export function LoginPage() {
               </form>
               <div className="mt-4 rounded-lg bg-primary/5 border border-primary/10 p-3">
                 <p className="text-xs text-muted-foreground">
-                  <strong className="text-foreground">How it works:</strong> We generate a
-                  unique wallet tied to your email. Same email = same wallet, every time.
+                  <strong className="text-foreground">How it works:</strong> Your wallet key is
+                  encrypted with your password using AES-256. Same email + same password = same wallet.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ========== STEP: GENERATE ========== */}
+        {step === "generate" && (
+          <Card className="bg-white border border-border animate-fade-in">
+            <CardHeader>
+              <button
+                onClick={() => setStep("choose")}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Plus className="w-5 h-5 text-emerald-600" />
+                Create New Wallet
+              </CardTitle>
+              <CardDescription>
+                Set a password to encrypt your new wallet key
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleGenerate} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gen-pw">Password</Label>
+                  <Input
+                    id="gen-pw"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Min 8 chars, 1 uppercase, 1 number"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gen-pw2">Confirm Password</Label>
+                  <Input
+                    id="gen-pw2"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Re-enter password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" variant="glow" className="w-full gap-2" disabled={loading}>
+                  {loading ? <Spinner className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                  Create Wallet
+                </Button>
+              </form>
+              <div className="mt-4 rounded-lg bg-amber-500/5 border border-amber-500/10 p-3">
+                <p className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Important:</strong> Your password encrypts your
+                  private key. There is no recovery — if you forget it, you lose access. You can export
+                  your key later from the dashboard.
                 </p>
               </div>
             </CardContent>
@@ -292,44 +532,69 @@ export function LoginPage() {
                 Import Private Key
               </CardTitle>
               <CardDescription>
-                Paste your existing private key to connect
+                Import and encrypt your existing key with a password
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="pk">Private Key</Label>
-                <div className="relative">
-                  <Input
-                    id="pk"
-                    type={showKey ? "text" : "password"}
-                    placeholder="0x..."
-                    value={privateKey}
-                    onChange={(e) => setPrivateKey(e.target.value)}
-                    className="pr-10 font-mono text-sm"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+            <CardContent>
+              <form onSubmit={handleImport} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pk">Private Key</Label>
+                  <div className="relative">
+                    <Input
+                      id="pk"
+                      type={showKey ? "text" : "password"}
+                      placeholder="0x..."
+                      value={privateKey}
+                      onChange={(e) => setPrivateKey(e.target.value)}
+                      className="pr-10 font-mono text-sm"
+                      required
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <Button
-                onClick={handleImport}
-                variant="glow"
-                className="w-full gap-2"
-                disabled={loading || !privateKey.trim()}
-              >
-                {loading ? <Spinner className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-                Import & Connect
-              </Button>
-              <div className="rounded-lg bg-amber-500/5 border border-amber-500/10 p-3">
-                <p className="text-xs text-amber-300/80">
-                  <strong>Security:</strong> Your private key is stored only in this
-                  browser's local storage. Never share your private key with anyone.
+                <div className="space-y-2">
+                  <Label htmlFor="imp-pw">Password</Label>
+                  <Input
+                    id="imp-pw"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Min 8 chars, 1 uppercase, 1 number"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="imp-pw2">Confirm Password</Label>
+                  <Input
+                    id="imp-pw2"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Re-enter password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="glow"
+                  className="w-full gap-2"
+                  disabled={loading}
+                >
+                  {loading ? <Spinner className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                  Import & Encrypt
+                </Button>
+              </form>
+              <div className="mt-4 rounded-lg bg-amber-500/5 border border-amber-500/10 p-3">
+                <p className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Security:</strong> Your private key will be
+                  AES-256 encrypted with your password immediately. The raw key is never stored.
                 </p>
               </div>
             </CardContent>

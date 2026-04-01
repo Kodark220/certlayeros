@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { readContract, toCalldataAddress } from "@/lib/genlayer";
 import { DEPLOYER_ADDRESS } from "@/lib/contract";
@@ -63,8 +63,7 @@ export function useRole() {
     return () => { cancelled = true; };
   }, [user]);
 
-  return { role, loading, protocolData, refreshRole: () => {
-    // Force re-detect by toggling loading
+  const refreshRole = useCallback(() => {
     setLoading(true);
     setRole(null);
     setProtocolData(null);
@@ -87,5 +86,7 @@ export function useRole() {
       })
       .catch(() => setRole(user?.chosenRole || "watcher"))
       .finally(() => setLoading(false));
-  }};
+  }, [user]);
+
+  return { role, loading, protocolData, refreshRole };
 }
