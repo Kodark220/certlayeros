@@ -66,45 +66,62 @@ export function DashboardPage() {
     if (!addr) return;
     setLoading(true);
     try {
-      // Load claimable balance
-      try {
-        const bal = await readContract("get_claimable_balance", [toCalldataAddress(addr)]);
-        setClaimable(String(bal));
-      } catch {}
+      // Kick off balance + count in parallel
+      const [balResult, countResult] = await Promise.allSettled([
+        readContract("get_claimable_balance", [toCalldataAddress(addr)]),
+        readContract("get_promise_count"),
+      ]);
 
-      // Load all promises and categorize
-      try {
-        const count = (await readContract("get_promise_count")) as number;
+      if (balResult.status === "fulfilled") setClaimable(String(balResult.value));
+
+      const count =
+        countResult.status === "fulfilled" ? (countResult.value as number) : 0;
+      const limit = Math.min(count, 50);
+
+      if (limit > 0) {
+        // Fetch all promises in parallel
+        const promiseResults = await Promise.allSettled(
+          Array.from({ length: limit }, (_, i) =>
+            readContract("get_promise", [String(i)]).then((raw) => {
+              const data = typeof raw === "string" ? JSON.parse(raw) : raw;
+              return { ...data, id: i } as PromiseData;
+            })
+          )
+        );
+
         const all: PromiseData[] = [];
         const mine: PromiseData[] = [];
-        const watched: PromiseData[] = [];
-        const limit = Math.min(count, 50);
-
-        for (let i = 0; i < limit; i++) {
-          try {
-            const raw = await readContract("get_promise", [String(i)]);
-            const data = typeof raw === "string" ? JSON.parse(raw) : raw;
-            const promise = { ...data, id: i };
-            all.push(promise);
-
-            if (data.protocol_owner?.toLowerCase() === addr.toLowerCase()) {
-              mine.push(promise);
+        for (const r of promiseResults) {
+          if (r.status === "fulfilled") {
+            all.push(r.value);
+            if (r.value.protocol_owner?.toLowerCase() === addr.toLowerCase()) {
+              mine.push(r.value);
             }
-
-            try {
-              const isW = await readContract("is_watcher", [
-                String(i),
-                toCalldataAddress(addr),
-              ]);
-              if (isW) watched.push(promise);
-            } catch {}
-          } catch {}
+          }
         }
+
+        // Check is_watcher for all promises in parallel
+        const watchResults = await Promise.allSettled(
+          all.map((p) =>
+            readContract("is_watcher", [String(p.id), toCalldataAddress(addr)])
+              .then((isW) => (isW ? p : null))
+          )
+        );
+        const watched = watchResults
+          .filter((r): r is PromiseFulfilledResult<PromiseData | null> => r.status === "fulfilled")
+          .map((r) => r.value)
+          .filter((p): p is PromiseData => p !== null);
 
         setAllPromises(all);
         setMyPromises(mine);
         setWatchedPromises(watched);
-      } catch {}
+      } else {
+        setAllPromises([]);
+        setMyPromises([]);
+        setWatchedPromises([]);
+      }
+    } catch {
+      // top-level catch — keep dashboard usable even on failure
     } finally {
       setLoading(false);
     }
