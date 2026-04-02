@@ -30,7 +30,8 @@ import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/spinner";
 import { PageTransition, motion, staggerContainer, staggerItem } from "@/components/motion";
 import { readContract, writeContract, toCalldataAddress } from "@/lib/genlayer";
-import { CONTRACT_ADDRESS, PROMISE_STATUS, NETWORK } from "@/lib/contract";
+import { PROMISE_STATUS } from "@/lib/contract";
+import { useNetwork } from "@/contexts/network-context";
 import { useAuth } from "@/contexts/auth-context";
 import { useRole, type ProtocolData } from "@/hooks/use-role";
 import toast from "react-hot-toast";
@@ -49,6 +50,7 @@ interface PromiseData {
 export function DashboardPage() {
   const { user } = useAuth();
   const { role, loading: roleLoading, protocolData, refreshRole } = useRole();
+  const { network } = useNetwork();
   const [allPromises, setAllPromises] = useState<PromiseData[]>([]);
   const [myPromises, setMyPromises] = useState<PromiseData[]>([]);
   const [watchedPromises, setWatchedPromises] = useState<PromiseData[]>([]);
@@ -254,7 +256,7 @@ export function DashboardPage() {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <a
-                  href={`${NETWORK.explorer}/address/${addr}`}
+                  href={`${network.explorer}/address/${addr}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -265,7 +267,7 @@ export function DashboardPage() {
                 </a>
                 <Badge variant="outline" className="text-[11px] h-6 gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {NETWORK.name}
+                  {network.name}
                 </Badge>
               </div>
             </div>
@@ -317,11 +319,11 @@ export function DashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Contract</p>
-                    <p className="font-mono text-xs bg-muted rounded-md px-3 py-2 truncate">{CONTRACT_ADDRESS}</p>
+                    <p className="font-mono text-xs bg-muted rounded-md px-3 py-2 truncate">{network.contractAddress}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Network</p>
-                    <p className="text-xs bg-muted rounded-md px-3 py-2">GenLayer Bradbury</p>
+                    <p className="text-xs bg-muted rounded-md px-3 py-2">{network.name}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Status</p>

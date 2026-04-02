@@ -1,7 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { readContract, toCalldataAddress } from "@/lib/genlayer";
-import { DEPLOYER_ADDRESS } from "@/lib/contract";
+import { NETWORKS, type NetworkId } from "@/lib/contract";
+
+function getDeployerAddress(): string {
+  try {
+    const stored = localStorage.getItem("certlayer_network");
+    if (stored && stored in NETWORKS) return NETWORKS[stored as NetworkId].deployerAddress;
+  } catch {}
+  return NETWORKS.studionet.deployerAddress;
+}
 
 export type UserRole = "admin" | "protocol" | "watcher";
 
@@ -31,7 +39,8 @@ export function useRole() {
       }
 
       // Check admin first (address match)
-      if (user.address.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase()) {
+      const deployerAddress = getDeployerAddress();
+      if (user.address.toLowerCase() === deployerAddress.toLowerCase()) {
         if (!cancelled) {
           setRole("admin");
           setLoading(false);
@@ -69,7 +78,8 @@ export function useRole() {
     setProtocolData(null);
     const addr = user?.address;
     if (!addr) { setLoading(false); return; }
-    if (addr.toLowerCase() === DEPLOYER_ADDRESS.toLowerCase()) {
+    const deployerAddress = getDeployerAddress();
+    if (addr.toLowerCase() === deployerAddress.toLowerCase()) {
       setRole("admin");
       setLoading(false);
       return;

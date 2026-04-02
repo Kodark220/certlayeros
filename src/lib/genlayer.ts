@@ -1,14 +1,27 @@
 import { createClient } from "genlayer-js";
 import { TransactionStatus, CalldataAddress } from "genlayer-js/types";
-import { testnetBradbury } from "genlayer-js/chains";
-import { CONTRACT_ADDRESS } from "./contract";
+import { testnetBradbury, studionet } from "genlayer-js/chains";
+import { NETWORKS, DEFAULT_NETWORK, type NetworkId } from "./contract";
 
-// Read client — no wallet needed, talks directly to RPC
-const readClientInstance = createClient({ chain: testnetBradbury });
+const CHAIN_MAP = {
+  bradbury: testnetBradbury,
+  studionet: studionet,
+} as const;
 
-// Write client — signs through the wallet provider (MetaMask)
+// ── State ──
+let activeNetworkId: NetworkId = (() => {
+  try {
+    const stored = localStorage.getItem("certlayer_network");
+    if (stored && stored in NETWORKS) return stored as NetworkId;
+  } catch {}
+  return DEFAULT_NETWORK;
+})();
+
+let readClientInstance = createClient({ chain: CHAIN_MAP[activeNetworkId] });
 let writeClientInstance: ReturnType<typeof createClient> | null = null;
 let currentWalletAddress: string | null = null;
+
+// ── Helpers ──
 
 export function toCalldataAddress(hexStr: string): CalldataAddress {
   const hex = hexStr.replace("0x", "");
@@ -17,14 +30,37 @@ export function toCalldataAddress(hexStr: string): CalldataAddress {
   );
 }
 
-/** Set up the write client using the connected wallet address + provider */
+function getContractAddress(): `0x${string}` {
+  return NETWORKS[activeNetworkId].contractAddress as `0x${string}`;
+}
+
+// ── Network switching ──
+
+export function switchNetwork(id: NetworkId) {
+  activeNetworkId = id;
+  readClientInstance = createClient({ chain: CHAIN_MAP[id] });
+  // Rebuild write client if wallet is connected
+  if (currentWalletAddress) {
+    const eth = (window as any).ethereum;
+    if (eth) {
+      writeClientInstance = createClient({
+        chain: CHAIN_MAP[id],
+        account: currentWalletAddress as `0x${string}`,
+        provider: eth,
+      });
+    }
+  }
+}
+
+// ── Wallet provider ──
+
 export function setWalletProvider(address: string) {
   const eth = (window as any).ethereum;
   if (!eth) throw new Error("No wallet provider found");
   if (address !== currentWalletAddress) {
     currentWalletAddress = address;
     writeClientInstance = createClient({
-      chain: testnetBradbury,
+      chain: CHAIN_MAP[activeNetworkId],
       account: address as `0x${string}`,
       provider: eth,
     });
@@ -36,16 +72,17 @@ export function clearWalletProvider() {
   writeClientInstance = null;
 }
 
-/** Switch the wallet to the GenLayer Bradbury testnet */
 export async function connectWalletToChain() {
   if (writeClientInstance) {
-    await writeClientInstance.connect("testnetBradbury");
+    await writeClientInstance.connect(NETWORKS[activeNetworkId].sdkChainKey as any);
   }
 }
 
+// ── Contract calls ──
+
 export async function readContract(functionName: string, args: any[] = []) {
   return readClientInstance.readContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
+    address: getContractAddress(),
     functionName,
     args,
   } as any);
@@ -58,7 +95,7 @@ export async function writeContract(
 ) {
   if (!writeClientInstance) throw new Error("Wallet not connected");
   const hash = await writeClientInstance.writeContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
+    address: getContractAddress(),
     functionName,
     args,
     value: BigInt(value),

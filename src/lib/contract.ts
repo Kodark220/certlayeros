@@ -1,13 +1,47 @@
-export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0xd734d92088F99E7C4985E9E16dA5EABf1353739C";
+export type NetworkId = "bradbury" | "studionet";
 
-export const DEPLOYER_ADDRESS = import.meta.env.VITE_DEPLOYER_ADDRESS || "0xf9346827f713eb953a2e22465b9ee91901726bdc";
+export interface NetworkConfig {
+  id: NetworkId;
+  name: string;
+  chainId: number;
+  rpcUrl: string;
+  explorer: string;
+  contractAddress: string;
+  deployerAddress: string;
+  /** The key used by client.connect() */
+  sdkChainKey: string;
+}
 
-export const NETWORK = {
-  name: import.meta.env.VITE_NETWORK_NAME || "Bradbury Testnet",
-  chainId: Number(import.meta.env.VITE_CHAIN_ID || 4221),
-  rpcUrl: import.meta.env.VITE_RPC_URL || "https://rpc-bradbury.genlayer.com",
-  explorer: import.meta.env.VITE_EXPLORER_URL || "https://explorer-bradbury.genlayer.com",
+export const NETWORKS: Record<NetworkId, NetworkConfig> = {
+  bradbury: {
+    id: "bradbury",
+    name: "Bradbury Testnet",
+    chainId: 4221,
+    rpcUrl: "https://rpc-bradbury.genlayer.com",
+    explorer: "https://explorer-bradbury.genlayer.com",
+    contractAddress: "0xd734d92088F99E7C4985E9E16dA5EABf1353739C",
+    deployerAddress: "0xf9346827f713eb953a2e22465b9ee91901726bdc",
+    sdkChainKey: "testnetBradbury",
+  },
+  studionet: {
+    id: "studionet",
+    name: "Studio Network",
+    chainId: 61999,
+    rpcUrl: "https://studio.genlayer.com/api",
+    explorer: "https://genlayer-explorer.vercel.app",
+    contractAddress: "0x51213C8e9d4238798601074FE1371a0fA61586A1",
+    deployerAddress: "0xf9346827f713eb953a2e22465b9ee91901726bdc",
+    sdkChainKey: "studionet",
+  },
 };
+
+export const DEFAULT_NETWORK: NetworkId = "studionet";
+
+/** Convenience accessors — reads from the currently-selected network at import time
+ *  For reactive access, use the useNetwork() hook instead. */
+export function getNetwork(id: NetworkId): NetworkConfig {
+  return NETWORKS[id];
+}
 
 export const PROMISE_STATUS: Record<number, { label: string; color: string }> = {
   0: { label: "Active", color: "text-blue-400" },

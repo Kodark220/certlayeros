@@ -16,7 +16,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { NETWORK } from "@/lib/contract";
+import { NETWORKS, type NetworkId } from "@/lib/contract";
+import { useNetwork } from "@/contexts/network-context";
 import { useAuth } from "@/contexts/auth-context";
 import { useRole } from "@/hooks/use-role";
 
@@ -26,6 +27,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuth();
   const { role } = useRole();
+  const { networkId, network, switchNetwork } = useNetwork();
 
   const navItems = !user
     ? [{ to: "/promises", label: "Promises", icon: FileText }]
@@ -107,16 +109,26 @@ export function Navbar() {
           {/* Right side */}
           <div className="hidden md:flex items-center gap-3">
             {showFullNav && (
-              <a
-                href={NETWORK.explorer}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-glow" />
-                {NETWORK.name}
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              <div className="flex items-center gap-2">
+                <select
+                  value={networkId}
+                  onChange={(e) => { switchNetwork(e.target.value as NetworkId); window.location.reload(); }}
+                  className="text-xs bg-secondary/50 border border-border rounded-md px-2 py-1 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {Object.values(NETWORKS).map((n) => (
+                    <option key={n.id} value={n.id}>{n.name}</option>
+                  ))}
+                </select>
+                <a
+                  href={network.explorer}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-glow" />
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             )}
             {user ? (
               <div className="flex items-center gap-2 ml-2">
@@ -189,14 +201,25 @@ export function Navbar() {
               );
             })}
             <div className="pt-3 border-t border-border">
+              <div className="px-4 py-2">
+                <select
+                  value={networkId}
+                  onChange={(e) => { switchNetwork(e.target.value as NetworkId); window.location.reload(); }}
+                  className="w-full text-sm bg-secondary/50 border border-border rounded-md px-2 py-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {Object.values(NETWORKS).map((n) => (
+                    <option key={n.id} value={n.id}>{n.name}</option>
+                  ))}
+                </select>
+              </div>
               <a
-                href={NETWORK.explorer}
+                href={network.explorer}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-muted-foreground px-4 py-2"
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                {NETWORK.name}
+                {network.name}
                 <ExternalLink className="w-3 h-3" />
               </a>
               {user ? (

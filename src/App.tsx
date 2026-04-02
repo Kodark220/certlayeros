@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import { NetworkProvider } from "@/contexts/network-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Layout } from "@/components/layout";
@@ -16,6 +17,7 @@ import { WithdrawPage } from "@/pages/withdraw";
 export default function App() {
   return (
     <BrowserRouter>
+      <NetworkProvider>
       <AuthProvider>
         <Toaster
           position="top-right"
@@ -73,6 +75,7 @@ export default function App() {
           </Route>
         </Routes>
       </AuthProvider>
+      </NetworkProvider>
     </BrowserRouter>
   );
 }
