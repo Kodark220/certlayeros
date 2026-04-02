@@ -103,6 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         clearWalletProvider();
         clearSession();
+      } else {
+        // User switched to a different account — re-auth with new address
+        const newAddr = accounts[0].toLowerCase();
+        setWalletProvider(newAddr);
+        setUser({ address: newAddr });
+        saveSession({ address: newAddr });
       }
     }
 

@@ -50,7 +50,7 @@ interface PromiseData {
 export function DashboardPage() {
   const { user } = useAuth();
   const { role, loading: roleLoading, protocolData, refreshRole } = useRole();
-  const { network } = useNetwork();
+  const { network, networkId } = useNetwork();
   const [allPromises, setAllPromises] = useState<PromiseData[]>([]);
   const [myPromises, setMyPromises] = useState<PromiseData[]>([]);
   const [watchedPromises, setWatchedPromises] = useState<PromiseData[]>([]);
@@ -127,7 +127,7 @@ export function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [addr]);
+  }, [addr, networkId]);
 
   useEffect(() => {
     loadData();

@@ -37,12 +37,6 @@ export const NETWORKS: Record<NetworkId, NetworkConfig> = {
 
 export const DEFAULT_NETWORK: NetworkId = "studionet";
 
-/** Convenience accessors — reads from the currently-selected network at import time
- *  For reactive access, use the useNetwork() hook instead. */
-export function getNetwork(id: NetworkId): NetworkConfig {
-  return NETWORKS[id];
-}
-
 export const PROMISE_STATUS: Record<number, { label: string; color: string }> = {
   0: { label: "Active", color: "text-blue-400" },
   1: { label: "Kept", color: "text-emerald-400" },

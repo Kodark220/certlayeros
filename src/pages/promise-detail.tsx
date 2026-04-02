@@ -33,6 +33,7 @@ import { PageHeader } from "@/components/page-header";
 import { Spinner } from "@/components/spinner";
 import { readContract, writeContract, toCalldataAddress } from "../lib/genlayer";
 import { PROMISE_STATUS } from "@/lib/contract";
+import { useNetwork } from "@/contexts/network-context";
 import toast from "react-hot-toast";
 
 interface PromiseData {
@@ -54,6 +55,7 @@ interface PromiseData {
 
 export function PromiseDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { networkId } = useNetwork();
   const [promise, setPromise] = useState<PromiseData | null>(null);
   const [protocol, setProtocol] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -86,7 +88,7 @@ export function PromiseDetailPage() {
       }
     }
     load();
-  }, [id]);
+  }, [id, networkId]);
 
   async function handleAction(action: string) {
     setActionLoading(action);

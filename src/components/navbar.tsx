@@ -67,7 +67,7 @@ export function Navbar() {
     ? { label: "Watcher", className: "bg-blue-50 text-blue-600 border-blue-200" }
     : null;
 
-  const showFullNav = location.pathname === "/" || location.pathname === "/select-role";
+  const showFullNav = !!user || location.pathname !== "/login";
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-border">
@@ -112,7 +112,7 @@ export function Navbar() {
               <div className="flex items-center gap-2">
                 <select
                   value={networkId}
-                  onChange={(e) => { switchNetwork(e.target.value as NetworkId); window.location.reload(); }}
+                  onChange={(e) => { switchNetwork(e.target.value as NetworkId); }}
                   className="text-xs bg-secondary/50 border border-border rounded-md px-2 py-1 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   {Object.values(NETWORKS).map((n) => (
@@ -204,7 +204,7 @@ export function Navbar() {
               <div className="px-4 py-2">
                 <select
                   value={networkId}
-                  onChange={(e) => { switchNetwork(e.target.value as NetworkId); window.location.reload(); }}
+                  onChange={(e) => { switchNetwork(e.target.value as NetworkId); }}
                   className="w-full text-sm bg-secondary/50 border border-border rounded-md px-2 py-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   {Object.values(NETWORKS).map((n) => (

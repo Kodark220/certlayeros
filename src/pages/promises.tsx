@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/page-header";
 import { Spinner } from "@/components/spinner";
 import { readContract } from "@/lib/genlayer";
 import { PROMISE_STATUS } from "@/lib/contract";
+import { useNetwork } from "@/contexts/network-context";
 
 interface PromiseData {
   description: string;
@@ -25,6 +26,7 @@ interface PromiseData {
 }
 
 export function PromisesPage() {
+  const { networkId } = useNetwork();
   const [promises, setPromises] = useState<(PromiseData & { id: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -32,27 +34,30 @@ export function PromisesPage() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
         const count = (await readContract("get_promise_count")) as number;
-        const loaded: (PromiseData & { id: number })[] = [];
-        for (let i = 0; i < count; i++) {
-          try {
-            const raw = (await readContract("get_promise", [String(i)])) as string;
-            const data = typeof raw === "string" ? JSON.parse(raw) : raw;
-            loaded.push({ ...data, id: i });
-          } catch {
-            // skip
-          }
-        }
+        const limit = Math.min(count, 50);
+        const results = await Promise.allSettled(
+          Array.from({ length: limit }, (_, i) =>
+            readContract("get_promise", [String(i)]).then((raw) => {
+              const data = typeof raw === "string" ? JSON.parse(raw) : raw;
+              return { ...data, id: i } as PromiseData & { id: number };
+            })
+          )
+        );
+        const loaded = results
+          .filter((r): r is PromiseFulfilledResult<PromiseData & { id: number }> => r.status === "fulfilled")
+          .map((r) => r.value);
         setPromises(loaded);
-      } catch (err) {
-        console.error(err);
+      } catch {
+        setPromises([]);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
+  }, [networkId]);
 
   const filtered = promises.filter((p) => {
     if (filter !== "all" && p.status !== parseInt(filter)) return false;

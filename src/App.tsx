@@ -3,6 +3,7 @@ import { Toaster } from "react-hot-toast";
 import { NetworkProvider } from "@/contexts/network-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ProtectedRoute } from "@/components/protected-route";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { Layout } from "@/components/layout";
 import { LandingPage } from "@/pages/landing";
 import { LoginPage } from "@/pages/login";
@@ -13,9 +14,11 @@ import { CreatePromisePage } from "@/pages/create-promise";
 import { PromisesPage } from "@/pages/promises";
 import { PromiseDetailPage } from "@/pages/promise-detail";
 import { WithdrawPage } from "@/pages/withdraw";
+import { NotFoundPage } from "@/pages/not-found";
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <NetworkProvider>
       <AuthProvider>
@@ -72,10 +75,12 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </AuthProvider>
       </NetworkProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }

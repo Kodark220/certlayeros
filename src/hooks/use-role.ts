@@ -1,15 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { readContract, toCalldataAddress } from "@/lib/genlayer";
-import { NETWORKS, type NetworkId } from "@/lib/contract";
-
-function getDeployerAddress(): string {
-  try {
-    const stored = localStorage.getItem("certlayer_network");
-    if (stored && stored in NETWORKS) return NETWORKS[stored as NetworkId].deployerAddress;
-  } catch {}
-  return NETWORKS.studionet.deployerAddress;
-}
+import { NETWORKS } from "@/lib/contract";
+import { useNetwork } from "@/contexts/network-context";
 
 export type UserRole = "admin" | "protocol" | "watcher";
 
@@ -24,6 +17,7 @@ export interface ProtocolData {
 
 export function useRole() {
   const { user } = useAuth();
+  const { networkId } = useNetwork();
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [protocolData, setProtocolData] = useState<ProtocolData | null>(null);
@@ -39,7 +33,7 @@ export function useRole() {
       }
 
       // Check admin first (address match)
-      const deployerAddress = getDeployerAddress();
+      const deployerAddress = NETWORKS[networkId].deployerAddress;
       if (user.address.toLowerCase() === deployerAddress.toLowerCase()) {
         if (!cancelled) {
           setRole("admin");
@@ -70,7 +64,7 @@ export function useRole() {
     setLoading(true);
     detect();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, networkId]);
 
   const refreshRole = useCallback(() => {
     setLoading(true);
@@ -78,7 +72,7 @@ export function useRole() {
     setProtocolData(null);
     const addr = user?.address;
     if (!addr) { setLoading(false); return; }
-    const deployerAddress = getDeployerAddress();
+    const deployerAddress = NETWORKS[networkId].deployerAddress;
     if (addr.toLowerCase() === deployerAddress.toLowerCase()) {
       setRole("admin");
       setLoading(false);
@@ -96,7 +90,7 @@ export function useRole() {
       })
       .catch(() => setRole(user?.chosenRole || "watcher"))
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [user, networkId]);
 
   return { role, loading, protocolData, refreshRole };
 }

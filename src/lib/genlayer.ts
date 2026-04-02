@@ -25,6 +25,9 @@ let currentWalletAddress: string | null = null;
 
 export function toCalldataAddress(hexStr: string): CalldataAddress {
   const hex = hexStr.replace("0x", "");
+  if (!hex || hex.length !== 40 || !/^[0-9a-fA-F]+$/.test(hex)) {
+    throw new Error("Invalid address: expected 40-character hex string");
+  }
   return new CalldataAddress(
     new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)))
   );
@@ -103,6 +106,7 @@ export async function writeContract(
   const receipt = await readClientInstance.waitForTransactionReceipt({
     hash,
     status: TransactionStatus.ACCEPTED,
+    retries: 60,
   });
   return { hash, receipt };
 }
